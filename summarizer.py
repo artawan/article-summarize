@@ -8,15 +8,21 @@ import networkx as nx
 import urllib3
 from bs4 import BeautifulSoup
  
-def read_article(link):
-    http = urllib3.PoolManager()
-    r = http.request('GET', link)
-    soup = BeautifulSoup(r.data, 'lxml')
-    article = soup.article.find_all('p')
+def read_article(source, content):
     sentences = []
+    
+    if source == 'url':
+        http = urllib3.PoolManager()
+        r = http.request('GET', content)
+        soup = BeautifulSoup(r.data, 'lxml')
+        article = soup.body.article.find_all('p')
+        for sentence in article:
+            sentences.append(sentence.text.replace("[^a-zA-Z]", " ").split(" "))
+    else:
+        article = content.split(". ")
+        for sentence in article:
+            sentences.append(sentence.replace("[^a-zA-Z]", " ").split(" "))
 
-    for sentence in article:
-        sentences.append(sentence.text.replace("[^a-zA-Z]", " ").split(" "))
     sentences.pop() 
 
     return sentences
@@ -60,18 +66,18 @@ def build_similarity_matrix(sentences, stop_words):
     return similarity_matrix
 
 
-def generate_summary(file_name, top_n=5):
+def generate_summary(source, content, top_n=5):
     stop_words = stopwords.words('english')
     summarize_text = []
 
     # Step 1 - Read text anc split it
-    sentences =  read_article(file_name)
+    sentences =  read_article(source, content)
 
-    # Step 2 - Generate Similary Martix across sentences
-    sentence_similarity_martix = build_similarity_matrix(sentences, stop_words)
+    # Step 2 - Generate Similarly Matrix across sentences
+    sentence_similarity_matrix = build_similarity_matrix(sentences, stop_words)
 
-    # Step 3 - Rank sentences in similarity martix
-    sentence_similarity_graph = nx.from_numpy_array(sentence_similarity_martix)
+    # Step 3 - Rank sentences in similarity matrix
+    sentence_similarity_graph = nx.from_numpy_array(sentence_similarity_matrix)
     scores = nx.pagerank(sentence_similarity_graph)
 
     # Step 4 - Sort the rank and pick top sentences
@@ -81,9 +87,5 @@ def generate_summary(file_name, top_n=5):
     for i in range(top_n):
       summarize_text.append(" ".join(ranked_sentence[i][1]))
 
-    # Step 5 - Offcourse, output the summarize texr
-    print("Summarize Text: \n", ". ".join(summarize_text))
-
-# Get article url
-article_url = input("Enter article url:")
-generate_summary(article_url, 2)
+    # Step 5 - output the summarize text
+    return summarize_text
